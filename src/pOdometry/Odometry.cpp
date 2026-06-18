@@ -23,11 +23,14 @@ Odometry::Odometry()
 
   m_current_x = 0;
   m_current_y = 0;
+  m_current_depth = 0;
 
   m_previous_x = 0;
   m_previous_y = 0;
 
   m_total_distance = 0;
+  m_total_distance_at_depth = 0;
+  m_depth_thresh = 0;
 }
 
 //---------------------------------------------------------
@@ -53,6 +56,9 @@ bool Odometry::OnNewMail(MOOSMSG_LIST &NewMail)
 
     else if(key == "NAV_Y")
       m_current_y = msg.GetDouble();
+
+    else if(key == "NAV_DEPTH")
+      m_current_depth = msg.GetDouble();
 
 #if 0 // Keep these around just for template
     string comm  = msg.GetCommunity();
@@ -99,12 +105,15 @@ bool Odometry::Iterate()
   	double leg_distance = sqrt(dx*dx + dy*dy);
 
   	m_total_distance += leg_distance;
+    if(m_current_depth > m_depth_thresh)
+      m_total_distance_at_depth += leg_distance;
 
   	m_previous_x = m_current_x;
   	m_previous_y = m_current_y;
 	}
 
   Notify("ODOMETRY_DIST", m_total_distance); 
+  Notify("ODOMETRY_DIST_AT_DEPTH", m_total_distance_at_depth); 
 
   AppCastingMOOSApp::PostReport();
   return(true);
@@ -131,10 +140,10 @@ bool Odometry::OnStartUp()
     string value = line;
 
     bool handled = false;
-    if(param == "foo") {
-      handled = true;
+    if(param == "depth_thresh") {
+      handled = setDoubleOnString(m_depth_thresh, value);
     }
-    else if(param == "bar") {
+    else if(param == "foo") {
       handled = true;
     }
 
@@ -157,6 +166,7 @@ void Odometry::registerVariables()
 
   Register("NAV_X", 0);
   Register("NAV_Y", 0);
+  Register("NAV_DEPTH", 0);
 }
 
 
@@ -174,10 +184,17 @@ bool Odometry::buildReport()
          << m_total_distance
          << " meters"
          << endl;
+  m_msgs << "Depth Threshold: "
+         << m_depth_thresh
+         << " meters"
+         << endl;
+  m_msgs << "Distance Above Depth Threshold: "
+         << m_total_distance_at_depth
+         << " meters"
+         << endl;
 
   return(true);
 }
-
 
 
 
