@@ -1,0 +1,217 @@
+//--------    FILE: bravo_uuv_fair.bhv   -------------
+
+initialize   DEPLOY = false
+initialize   RETURN = false
+initialize   LOITER_REGION = west
+initialize   SURFACE = false
+	
+//----------------------------------------------
+Behavior=BHV_Waypoint
+{
+  name      = home_return
+  pwt       = 100
+  condition = RETURN = true
+  condition = DEPLOY = true
+
+  endflag   = MISSION = complete
+  endflag   = DEPLOY = false
+  endflag   = SURFACE = false
+	
+           speed = 2.5
+  capture_radius = 5
+     slip_radius = 8.0
+          points = 0,-20
+}
+
+//-----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = depth_return
+  pwt       = 100
+
+  condition = DEPLOY = true
+  condition = RETURN = true
+
+  depth = 10
+
+  duration = no-time-limit
+}
+
+//-----------------------------------------------
+Behavior = BHV_Loiter
+ {
+   // West Loiter Behavior
+   // ---------------------------
+   name         = loiter-west           // example
+   pwt          = 100                   // default
+   condition    = DEPLOY==true          // example
+   condition    = RETURN==false
+   condition    = LOITER_REGION=west
+   condition    = SURFACE==false
+
+   endflag      = LOITER_REGION=east
+
+   perpetual    = true
+
+   // Parameters specific to this behavior
+   // ------------------------------------
+        acquire_dist = 10               // default
+      capture_radius = 3                // default  
+     center_activate = false            // default
+           clockwise = false            // default
+         slip_radius = 15               // default
+               speed = 2.5              // default
+       spiral_factor = -2               // default
+            duration = 150
+ duration_idle_decay = false        
+            
+             polygon = radial:: x=100,y=-75,radius=30,pts=8  // example
+
+        visual_hints = vertex_size  = 1             // default
+        visual_hints = edge_size    = 1             // default
+        visual_hints = vertex_color = dodger_blue   // default
+        visual_hints = edge_color   = white         // default
+        visual_hints = nextpt_color = yellow        // default
+        visual_hints = nextpt_lcolor = aqua         // default
+        visual_hints = nextpt_vertex_size = 5       // default
+        visual_hints = label        = west          // example 
+ }
+
+//-----------------------------------------------
+Behavior = BHV_Loiter
+ {
+   // East Loiter Behavior
+   // ---------------------------
+   name         = loiter-east           // example
+   pwt          = 100                   // default
+   condition    = DEPLOY==true          // example
+   condition    = RETURN==false
+   condition    = LOITER_REGION=east
+   condition    = SURFACE==false
+
+   endflag      = LOITER_REGION=west
+
+   perpetual    = true
+
+   // Parameters specific to this behavior
+   // ------------------------------------
+        acquire_dist = 10               // default
+      capture_radius = 3                // default
+     center_activate = false            // default
+           clockwise = true             // default
+         slip_radius = 15               // default
+               speed = 2.5              // default
+       spiral_factor = -2               // default
+            duration = 150         
+ duration_idle_decay = false
+            
+             polygon = radial:: x=160,y=-50,radius=20,pts=8  // example
+
+        visual_hints = vertex_size  = 1             // default
+        visual_hints = edge_size    = 1             // default
+        visual_hints = vertex_color = dodger_blue   // default
+        visual_hints = edge_color   = white         // default
+        visual_hints = nextpt_color = yellow        // default
+        visual_hints = nextpt_lcolor = aqua         // default
+        visual_hints = nextpt_vertex_size = 5       // default
+        visual_hints = label        = east          // example 
+ }
+
+//-----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = depth_west
+  pwt       = 100
+
+  condition = DEPLOY==true
+  condition = RETURN==false
+  condition = LOITER_REGION=west
+  condition = SURFACE==false
+
+  depth = 30
+
+  duration = no-time-limit
+}
+
+//-----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = depth_east
+  pwt       = 100
+
+  condition = DEPLOY==true
+  condition = RETURN==false
+  condition = LOITER_REGION=east
+  condition = SURFACE==false
+
+  depth = 10
+
+  duration = no-time-limit
+}
+
+//----------------------------------------------
+Behavior = BHV_ConstantDepth
+{
+  name      = surface_mode
+  pwt       = 100
+
+  condition = DEPLOY = true
+  condition = RETURN = false
+  condition = SURFACE= true
+
+  perpetual = true
+
+  depth     = 0
+
+  duration  = no-time-limit
+}
+
+//---------------------------------------------
+Behavior = BHV_ConstantSpeed
+{
+  name      = surface_stop
+  pwt       = 200
+
+  condition = DEPLOY = true
+  condition = RETURN = false
+  condition = SURFACE = true
+  condition = NAV_DEPTH <= 1
+
+  perpetual = true
+
+  speed     = 0
+
+  duration  = no-time-limit
+}
+
+//----------------------------------------------
+// Dive Timer -> Surface
+Behavior = BHV_Timer
+{
+  name      = dive_timer
+  condition = DEPLOY = true
+  condition = RETURN = false
+  condition = SURFACE = false
+  duration            = 200
+  duration_idle_decay = false
+  perpetual           = true
+  endflag   = SURFACE = true
+}
+
+//----------------------------------------------
+// Surface Timer 
+Behavior = BHV_Timer
+{
+  name      = surface_timer
+  condition = DEPLOY = true
+  condition = RETURN = false
+  condition = SURFACE = true
+  condition = NAV_DEPTH <= 1
+
+  duration            = 60
+  duration_idle_decay = false
+
+  perpetual           = true
+
+  endflag   = SURFACE = false
+}
