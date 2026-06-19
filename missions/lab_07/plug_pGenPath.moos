@@ -1,0 +1,29 @@
+//--------------------------------------------------
+// pGenPath Configuration Block
+
+ProcessConfig = pGenPath
+{
+  AppTick   = 10
+  CommsTick = 10
+
+  updates_var   = WPT_UPDATE
+  activate_var  = VISIT
+  visit_radius  = 4
+  default_nav_x = 0
+  default_nav_y = 0
+
+  adaptive_speed     = true
+  cruise_speed       = 0.70
+  slow_speed         = 0.50
+  pivot_speed        = 0.30
+  sharp_turn_angle   = 25
+  pivot_turn_angle   = 65
+  slow_down_range    = 45
+  speed_post_interval = 0.25
+
+  pivot_turn          = true
+  pivot_heading_error = 15
+  pivot_release_error = 5
+  pivot_min_dist      = 1.5
+  pivot_thrust        = 100
+}

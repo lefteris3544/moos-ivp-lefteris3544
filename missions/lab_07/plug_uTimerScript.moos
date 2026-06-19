@@ -1,0 +1,21 @@
+//--------------------------------------------------
+// uTimerScript Configuration Block
+
+ProcessConfig = uTimerScript
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  paused      = false
+  script_name = visit_points
+  reset_max   = 0
+  shuffle     = false
+  verbose     = false
+
+  rand_var = varname=X, min=-25,  max=200, key=at_post
+  rand_var = varname=Y, min=-175, max=-25, key=at_post
+
+  event = var=VISIT_POINT, val="firstpoint", time=1.0
+  event = var=VISIT_POINT, val="x=$[X], y=$[Y], id=$[TCOUNT]", time=2.0, amt=100
+  event = var=VISIT_POINT, val="lastpoint", time=3.0
+}

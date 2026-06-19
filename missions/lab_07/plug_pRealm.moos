@@ -1,0 +1,10 @@
+//--------------------------------------------------
+// pRealm Configuration Block
+
+ProcessConfig = pRealm
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  hist_var = VISIT_POINT
+}
