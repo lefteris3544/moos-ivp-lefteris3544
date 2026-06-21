@@ -1,0 +1,10 @@
+// Alternate rescue region for replanning tests.
+poly = pts={60,10:99,-71:-37,-136:-76,-54}
+swimmer = name=p01, x=72, y=-18
+swimmer = name=p02, x=84, y=-56
+swimmer = name=p03, x=22, y=-84
+swimmer = name=p04, x=-18, y=-104
+swimmer = name=p05, x=-52, y=-62
+swimmer = name=p06, x=-20, y=-70
+swimmer = name=p07, x=45, y=-42
+swimmer = name=p08, x=11, y=-33

@@ -1,0 +1,59 @@
+//-----------------------------------------------
+// Helm Behavior file for Lab 09 rescue vehicle
+
+initialize   DEPLOY = false
+initialize   RETURN = false
+
+set MODE = ACTIVE {
+  DEPLOY = true
+} INACTIVE
+
+set MODE = RETURNING {
+  MODE = ACTIVE
+  RETURN = true
+}
+
+set MODE = RESCUING {
+  MODE = ACTIVE
+  RETURN = false
+}
+
+//----------------------------------------------
+Behavior = BHV_Waypoint
+{
+  name      = rescue_waypoints
+  pwt       = 100
+  condition = MODE==RESCUING
+  updates   = WPT_UPDATE
+  perpetual = true
+
+       speed = 1.0
+      radius = 4.0
+capture_radius = 5.0
+   nm_radius = 12.0
+ slip_radius = 8.0
+      points = -137,-31:-74,-6
+        lead = 2
+ lead_damper = 1
+
+  visual_hints = nextpt_color=lime, nextpt_lcolor=white
+  visual_hints = vertex_color=lime, edge_color=white
+}
+
+//----------------------------------------------
+Behavior = BHV_Waypoint
+{
+  name      = return_home
+  pwt       = 100
+  condition = MODE==RETURNING
+  perpetual = true
+
+       speed = 1.0
+      radius = 4.0
+capture_radius = 5.0
+   nm_radius = 12.0
+ slip_radius = 8.0
+      points = $(RETURN_POS)
+        lead = 2
+ lead_damper = 1
+}

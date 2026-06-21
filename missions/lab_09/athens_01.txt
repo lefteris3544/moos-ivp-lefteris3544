@@ -1,0 +1,7 @@
+// Small rescue region for quick tests.
+poly = pts={-215,-2:-76,-86:-16,6:-79,4}
+swimmer = name=p01, x=-137, y=-31
+swimmer = name=p02, x=-74, y=-6
+swimmer = name=p03, x=-103, y=-2
+swimmer = name=p04, x=-111, y=-25
+swimmer = name=p05, x=-198, y=-7

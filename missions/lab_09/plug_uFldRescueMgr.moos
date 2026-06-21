@@ -1,0 +1,12 @@
+//--------------------------------------------------
+// uFldRescueMgr Configuration Block
+
+ProcessConfig = uFldRescueMgr
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  swim_file      = $(SWIM_FILE)
+  alert_interval = 15
+  rescue_radius  = 8
+}

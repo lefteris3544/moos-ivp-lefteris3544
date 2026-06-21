@@ -1,0 +1,16 @@
+//--------------------------------------------------
+// pGenRescue Configuration Block
+
+ProcessConfig = pGenRescue
+{
+  AppTick   = 4
+  CommsTick = 4
+
+  vname = $(VNAME)
+
+  updates_var       = WPT_UPDATE
+  swimmer_alert_var = SWIMMER_ALERT
+  found_swimmer_var = FOUND_SWIMMER
+  rescue_region_var = RESCUE_REGION
+  request_var       = RESCUE_REQUEST
+}

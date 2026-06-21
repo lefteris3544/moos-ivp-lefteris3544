@@ -1,0 +1,86 @@
+//*******************************************************
+// ShoreSide Configuration File for Lab 09 Rescue
+
+ServerHost = localhost
+ServerPort = $(VPORT)
+Community  = $(VNAME)
+
+#include plug_origin_warp.moos
+
+//--------------------------------------------------------
+ProcessConfig = ANTLER
+{
+  MSBetweenLaunches = 100
+
+  Run = MOOSDB          @ NewConsole = false
+  Run = pRealm          @ NewConsole = false
+  Run = pMarineViewer   @ NewConsole = false
+  Run = pLogger         @ NewConsole = false
+  Run = pShare          @ NewConsole = false
+  Run = pHostInfo       @ NewConsole = false
+  Run = uFldShoreBroker @ NewConsole = false
+  Run = uFldRescueMgr   @ NewConsole = false
+}
+
+#include plug_pShare.moos
+#include plug_pHostInfo.moos
+#include plug_pLogger.moos
+#include plug_pRealm.moos
+#include plug_uFldRescueMgr.moos
+
+//--------------------------------------------------
+// uFldShoreBroker Configuration Block
+
+ProcessConfig = uFldShoreBroker
+{
+  AppTick       = 1
+  CommsTick     = 1
+
+  qbridge  = NODE_REPORT, APPCAST_REQ
+  qbridge  = RESCUE_REQUEST
+  qbridge  = DEPLOY, MOOS_MANUAL_OVERRIDE, RETURN
+
+  bridge   = src=DEPLOY_ALL, alias=DEPLOY
+  bridge   = src=RETURN_ALL, alias=RETURN
+  bridge   = src=MOOS_MANUAL_OVERRIDE_ALL, alias=MOOS_MANUAL_OVERRIDE
+  bridge   = src=SWIMMER_ALERT, alias=SWIMMER_ALERT
+  bridge   = src=FOUND_SWIMMER, alias=FOUND_SWIMMER
+  bridge   = src=RESCUE_REGION, alias=RESCUE_REGION
+}
+
+//--------------------------------------------------------
+ProcessConfig = pMarineViewer
+{
+  AppTick    = 4
+  CommsTick  = 4
+
+  set_pan_x            = -115
+  set_pan_y            = -40
+  zoom                 = 0.85
+  vehicles_shape_scale = 1.5
+  vehicles_name_mode   = names+shortmode
+
+  nodes_font_size      = xlarge
+  procs_font_size      = xlarge
+  appcast_font_size    = large
+
+  point_viewable_labels   = false
+  polygon_viewable_labels = true
+  appcast_viewable        = true
+  appcast_color_scheme    = indigo
+  hash_delta              = 50
+  hash_viewable           = true
+  hash_shade              = 0.35
+
+  scope = NODE_REPORT
+  scope = SWIMMER_ALERT
+  scope = FOUND_SWIMMER
+  scope = RESCUE_REQUEST
+  scope = RESCUE_REGION
+
+  button_one = DEPLOY # DEPLOY_ALL=true
+  button_one = MOOS_MANUAL_OVERRIDE_ALL=false
+  button_one = RETURN_ALL=false
+
+  button_two = RETURN # RETURN_ALL=true
+}
