@@ -1,0 +1,19 @@
+# Runtime logs
+MOOSLog_*/
+LOG_*/
+XLOG_*/
+.LastOpenedMOOSLogDirectory
+.mem_info*
+
+# Generated launch files
+targ_*
+tmp_*
+*.moos++
+
+# Generated field metadata
+vcolors.txt
+vloiterpos.txt
+vnames.txt
+vpositions.txt
+vspeeds.txt
+vlocations.txt
