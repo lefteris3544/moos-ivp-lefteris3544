@@ -84,7 +84,7 @@ bool GenRescue::Iterate()
 {
   AppCastingMOOSApp::Iterate();
   
-  if(m_plan_pending)
+  if(m_plan_pending && m_nav_x_set && m_nav_y_set)
     postShortestPath();
 
   AppCastingMOOSApp::PostReport();
@@ -123,6 +123,8 @@ void GenRescue::RegisterVariables()
   Register("SWIMMER_ALERT", 0);
   Register("MOB_ALERT", 0);
   Register("FOUND_SWIMMER", 0);
+  Register("NAV_X", 0);
+  Register("NAV_Y", 0);
 }
 
 
@@ -238,5 +240,6 @@ bool GenRescue::buildReport()
   m_msgs << "Known swimmers: " << m_swimmers.size() << endl;
   m_msgs << "Found swimmers: " << m_found_swimmers.size() << endl;
   m_msgs << "Path points:    " << m_path.size() << endl;
+  m_msgs << "NAV_X/Y set:    " << boolToString(m_nav_x_set && m_nav_y_set) << endl;
   return(true);
 }

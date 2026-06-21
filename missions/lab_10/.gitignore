@@ -1,5 +1,23 @@
+# Runtime logs and generated launch files
+MOOSLog_*/
+LOG_*/
+XLOG_*/
+targ_*
+.LastOpenedMOOSLogDirectory
+.mem_info*
+.runlog
+results.txt
+
+# Generated vehicle/app launch metadata
+vapps.txt
+vcolors.txt
+vgroups.txt
 vmates.txt
+vnames.txt
+vpositions.txt
 vroles.txt
+vspeeds.txt
+
+# Scratch/generated swim files
 foo*
 mit_rand.txt
-vapps.txt
