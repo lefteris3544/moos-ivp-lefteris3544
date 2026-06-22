@@ -34,7 +34,6 @@ class GenRescue : public AppCastingMOOSApp
   bool handleMailNewSwimmer(std::string);
   bool handleMailFoundSwimmer(std::string);
   bool handleMailNodeReport(std::string);
-  bool handleMailRescueRegion(std::string);
   void postShortestPath();
   void postNullPath();
   void postPath();
