@@ -34,11 +34,17 @@ class GenRescue : public AppCastingMOOSApp
   bool handleMailNewSwimmer(std::string);
   bool handleMailFoundSwimmer(std::string);
   bool handleMailNodeReport(std::string);
+  void handleMailWptStat(std::string);
   void postShortestPath();
   void postNullPath();
   void postPath();
+  void updateAdaptiveSpeed();
+  void postSpeedUpdate(double);
+  double calcTurnAngle(unsigned int) const;
   XYSegList buildPendingPath() const;
   XYSegList buildGreedyTwoHopPath(XYSegList, double, double) const;
+  XYSegList buildCompetitivePath(XYSegList, double, double) const;
+  double getNearestContactDist(double, double) const;
   std::set<std::string> getConcededSwimmers() const;
   std::string stringFromSet(std::set<std::string>) const;
   unsigned int getPendingSwimmerCount() const;
@@ -51,6 +57,17 @@ class GenRescue : public AppCastingMOOSApp
   unsigned int m_concede_path_count;
   double      m_concede_radius;
   double      m_concede_heading_window;
+  double      m_competitive_weight;
+  double      m_competitive_lost_margin;
+  double      m_contact_replan_interval;
+  bool        m_adaptive_speed;
+  double      m_cruise_speed;
+  double      m_slow_speed;
+  double      m_pivot_speed;
+  double      m_sharp_turn_angle;
+  double      m_pivot_turn_angle;
+  double      m_slow_down_range;
+  double      m_speed_post_interval;
   
  private: // State variables
   XYSegList  m_path;
@@ -68,6 +85,13 @@ class GenRescue : public AppCastingMOOSApp
   double     m_contact_hdg;
   bool       m_contact_xy_set;
   bool       m_contact_hdg_set;
+  double     m_last_contact_replan_time;
+  std::map<std::string, XYPoint> m_contacts;
+  int        m_wpt_index;
+  double     m_wpt_dist;
+  bool       m_wpt_stat_received;
+  double     m_current_speed;
+  double     m_last_speed_post_time;
 };
 
 #endif 

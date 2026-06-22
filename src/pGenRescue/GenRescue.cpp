@@ -8,6 +8,7 @@
 #include <iterator>
 #include <algorithm>
 #include <limits>
+#include <cmath>
 #include "GenRescue.h"
 #include "MBUtils.h"
 #include "ColorParse.h"
@@ -40,11 +41,28 @@ GenRescue::GenRescue()
   m_concede_path_count = 0;
   m_concede_radius = 0;
   m_concede_heading_window = 0;
+  m_competitive_weight = 0.35;
+  m_competitive_lost_margin = 10;
+  m_contact_replan_interval = 1.0;
+  m_adaptive_speed = true;
+  m_cruise_speed = 1.6;
+  m_slow_speed = 0.9;
+  m_pivot_speed = 0.5;
+  m_sharp_turn_angle = 70;
+  m_pivot_turn_angle = 115;
+  m_slow_down_range = 25;
+  m_speed_post_interval = 1.0;
   m_contact_x = 0;
   m_contact_y = 0;
   m_contact_hdg = 0;
   m_contact_xy_set = false;
   m_contact_hdg_set = false;
+  m_last_contact_replan_time = 0;
+  m_wpt_index = -1;
+  m_wpt_dist = 0;
+  m_wpt_stat_received = false;
+  m_current_speed = -1;
+  m_last_speed_post_time = 0;
 }
 
 //---------------------------------------------------------
@@ -67,6 +85,8 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       handled = handleMailFoundSwimmer(sval);
     else if(key == "NODE_REPORT")
       handled = handleMailNodeReport(sval);
+    else if(key == "WPT_STAT")
+      handleMailWptStat(sval);
     else if(key == "NAV_X") {
       m_nav_x = msg.GetDouble();
       m_nav_x_set = true;
@@ -105,6 +125,8 @@ bool GenRescue::Iterate()
   if(m_plan_pending && m_nav_x_set && m_nav_y_set)
     postShortestPath();
 
+  updateAdaptiveSpeed();
+
   AppCastingMOOSApp::PostReport();
   return(true);
 }
@@ -138,6 +160,28 @@ bool GenRescue::OnStartUp()
       m_concede_radius = atof(value.c_str());
     else if(param == "concede_heading_window")
       m_concede_heading_window = atof(value.c_str());
+    else if(param == "competitive_weight")
+      m_competitive_weight = atof(value.c_str());
+    else if(param == "competitive_lost_margin")
+      m_competitive_lost_margin = atof(value.c_str());
+    else if(param == "contact_replan_interval")
+      m_contact_replan_interval = atof(value.c_str());
+    else if(param == "adaptive_speed")
+      setBooleanOnString(m_adaptive_speed, value);
+    else if(param == "cruise_speed")
+      m_cruise_speed = atof(value.c_str());
+    else if(param == "slow_speed")
+      m_slow_speed = atof(value.c_str());
+    else if(param == "pivot_speed")
+      m_pivot_speed = atof(value.c_str());
+    else if(param == "sharp_turn_angle")
+      m_sharp_turn_angle = atof(value.c_str());
+    else if(param == "pivot_turn_angle")
+      m_pivot_turn_angle = atof(value.c_str());
+    else if(param == "slow_down_range")
+      m_slow_down_range = atof(value.c_str());
+    else if(param == "speed_post_interval")
+      m_speed_post_interval = atof(value.c_str());
   }
 
   if(m_vname == "")
@@ -159,6 +203,7 @@ void GenRescue::RegisterVariables()
   Register("NODE_REPORT", 0);
   Register("NAV_X", 0);
   Register("NAV_Y", 0);
+  Register("WPT_STAT", 0);
 }
 
 
@@ -202,16 +247,39 @@ bool GenRescue::handleMailNodeReport(string str)
   m_contact_x = record.getX();
   m_contact_y = record.getY();
   m_contact_xy_set = true;
+  m_contacts[m_contact_name] = XYPoint(m_contact_x, m_contact_y);
 
   if(record.isSetHeading()) {
     m_contact_hdg = record.getHeading();
     m_contact_hdg_set = true;
   }
 
-  if(m_concede_adversary)
+  bool competitive = (m_planner == "competitive");
+  bool have_pending = (m_swimmers.size() > m_found_swimmers.size());
+  double elapsed = MOOSTime() - m_last_contact_replan_time;
+  bool replan_due = (elapsed >= m_contact_replan_interval);
+
+  if(m_concede_adversary || (competitive && have_pending && replan_due)) {
     m_plan_pending = true;
+    m_last_contact_replan_time = MOOSTime();
+  }
 
   return(true);
+}
+
+//---------------------------------------------------------
+// Procedure: handleMailWptStat()
+
+void GenRescue::handleMailWptStat(string stat)
+{
+  if(strContains(stat, "behavior-name=waypt_survey") &&
+     strContains(stat, "index=")) {
+    m_wpt_index = atoi(tokStringParse(stat, "index", ',', '=').c_str());
+    string dist = tokStringParse(stat, "dist", ',', '=');
+    if(isNumber(dist))
+      m_wpt_dist = atof(dist.c_str());
+    m_wpt_stat_received = true;
+  }
 }
 
 //---------------------------------------------------------
@@ -258,7 +326,9 @@ void GenRescue::postShortestPath()
     return;
   }
 
-  if(m_planner == "two_hop")
+  if(m_planner == "competitive")
+    m_path = buildCompetitivePath(pending, m_nav_x, m_nav_y);
+  else if(m_planner == "two_hop")
     m_path = buildGreedyTwoHopPath(pending, m_nav_x, m_nav_y);
   else
     m_path = greedyPath(pending, m_nav_x, m_nav_y);
@@ -335,6 +405,99 @@ XYSegList GenRescue::buildGreedyTwoHopPath(XYSegList pending,
   }
 
   return(path);
+}
+
+//---------------------------------------------------------
+// Procedure: buildCompetitivePath()
+
+XYSegList GenRescue::buildCompetitivePath(XYSegList pending,
+                                          double start_x,
+                                          double start_y) const
+{
+  if(!m_contact_xy_set)
+    return(buildGreedyTwoHopPath(pending, start_x, start_y));
+
+  XYSegList path;
+  double curr_x = start_x;
+  double curr_y = start_y;
+
+  while(pending.size() > 0) {
+    unsigned int best_ix = 0;
+    double best_score = numeric_limits<double>::max();
+    bool have_winnable = false;
+
+    for(unsigned int i=0; i<pending.size(); i++) {
+      double ix = pending.get_vx(i);
+      double iy = pending.get_vy(i);
+      double own_dist = distPointToPoint(curr_x, curr_y, ix, iy);
+      double contact_dist = getNearestContactDist(ix, iy);
+      bool lost = ((contact_dist + m_competitive_lost_margin) < own_dist);
+      if(!lost)
+        have_winnable = true;
+    }
+
+    for(unsigned int i=0; i<pending.size(); i++) {
+      double ix = pending.get_vx(i);
+      double iy = pending.get_vy(i);
+      double own_dist = distPointToPoint(curr_x, curr_y, ix, iy);
+      double contact_dist = getNearestContactDist(ix, iy);
+      bool lost = ((contact_dist + m_competitive_lost_margin) < own_dist);
+      if(lost && have_winnable)
+        continue;
+
+      double own_advantage = contact_dist - own_dist;
+      double score = own_dist;
+      if(own_advantage > 0)
+        score -= (m_competitive_weight * own_advantage);
+
+      if(pending.size() > 1) {
+        double nearest_next = numeric_limits<double>::max();
+        for(unsigned int j=0; j<pending.size(); j++) {
+          if(i == j)
+            continue;
+          double jx = pending.get_vx(j);
+          double jy = pending.get_vy(j);
+          double dist = distPointToPoint(ix, iy, jx, jy);
+          if(dist < nearest_next)
+            nearest_next = dist;
+        }
+        score += 0.25 * nearest_next;
+      }
+
+      if(score < best_score) {
+        best_score = score;
+        best_ix = i;
+      }
+    }
+
+    double vx = pending.get_vx(best_ix);
+    double vy = pending.get_vy(best_ix);
+    path.add_vertex(vx, vy);
+    pending.delete_vertex(best_ix);
+    curr_x = vx;
+    curr_y = vy;
+  }
+
+  return(path);
+}
+
+//---------------------------------------------------------
+// Procedure: getNearestContactDist()
+
+double GenRescue::getNearestContactDist(double x, double y) const
+{
+  if(m_contacts.size() == 0)
+    return(distPointToPoint(m_contact_x, m_contact_y, x, y));
+
+  double nearest = numeric_limits<double>::max();
+  map<string, XYPoint>::const_iterator p;
+  for(p=m_contacts.begin(); p!=m_contacts.end(); p++) {
+    double dist = distPointToPoint(p->second.x(), p->second.y(), x, y);
+    if(dist < nearest)
+      nearest = dist;
+  }
+
+  return(nearest);
 }
 
 //---------------------------------------------------------
@@ -481,8 +644,81 @@ void GenRescue::postPath()
 
   Notify(update_var, update_str);
   reportEvent("SURVEY_UPDATE=" + update_str);
+
+  m_wpt_stat_received = false;
+  m_wpt_index = -1;
+  if(m_adaptive_speed)
+    postSpeedUpdate(m_cruise_speed);
 }
 
+//---------------------------------------------------------
+// Procedure: updateAdaptiveSpeed()
+
+void GenRescue::updateAdaptiveSpeed()
+{
+  if(!m_adaptive_speed || !m_wpt_stat_received || (m_wpt_index < 0))
+    return;
+  if(m_path.size() == 0)
+    return;
+
+  unsigned int ix = (unsigned int)m_wpt_index;
+  if(ix >= m_path.size())
+    ix = m_path.size() - 1;
+
+  double turn_angle = calcTurnAngle(ix);
+  bool close_to_turn = (m_wpt_dist <= m_slow_down_range);
+  bool sharp_turn = (turn_angle >= m_sharp_turn_angle);
+  bool pivot_turn = (turn_angle >= m_pivot_turn_angle);
+
+  double target_speed = m_cruise_speed;
+  if(close_to_turn && pivot_turn)
+    target_speed = m_pivot_speed;
+  else if(close_to_turn && sharp_turn)
+    target_speed = m_slow_speed;
+
+  double elapsed = MOOSTime() - m_last_speed_post_time;
+  bool changed = (fabs(target_speed - m_current_speed) > 0.01);
+  if(changed || (elapsed >= m_speed_post_interval))
+    postSpeedUpdate(target_speed);
+}
+
+//---------------------------------------------------------
+// Procedure: postSpeedUpdate()
+
+void GenRescue::postSpeedUpdate(double speed)
+{
+  Notify("SURVEY_UPDATE", "speed=" + doubleToStringX(speed, 2));
+  m_current_speed = speed;
+  m_last_speed_post_time = MOOSTime();
+}
+
+//---------------------------------------------------------
+// Procedure: calcTurnAngle()
+
+double GenRescue::calcTurnAngle(unsigned int ix) const
+{
+  if((m_path.size() < 2) || ((ix + 1) >= m_path.size()))
+    return(0);
+
+  double ax = m_nav_x;
+  double ay = m_nav_y;
+  if(ix > 0) {
+    ax = m_path.get_vx(ix - 1);
+    ay = m_path.get_vy(ix - 1);
+  }
+  double bx = m_path.get_vx(ix);
+  double by = m_path.get_vy(ix);
+  double cx = m_path.get_vx(ix + 1);
+  double cy = m_path.get_vy(ix + 1);
+
+  double hdg1 = relAng(ax, ay, bx, by);
+  double hdg2 = relAng(bx, by, cx, cy);
+  double delta = angle180(hdg2 - hdg1);
+  if(delta < 0)
+    delta *= -1;
+
+  return(delta);
+}
 
 //---------------------------------------------------------
 // Procedure: buildReport()
@@ -504,6 +740,34 @@ bool GenRescue::buildReport()
   m_msgs << "Concede radius:      " << doubleToStringX(m_concede_radius, 1) << endl;
   m_msgs << "Concede hdg window:  "
          << doubleToStringX(m_concede_heading_window, 1) << endl;
+  m_msgs << "Competitive weight:  "
+         << doubleToStringX(m_competitive_weight, 2) << endl;
+  m_msgs << "Lost margin/replan:  "
+         << doubleToStringX(m_competitive_lost_margin, 1) << " / "
+         << doubleToStringX(m_contact_replan_interval, 1) << endl;
+  m_msgs << "Adaptive speed:      " << boolToString(m_adaptive_speed) << endl;
+  m_msgs << "Cruise/Slow/Pivot:   "
+         << doubleToStringX(m_cruise_speed, 2) << " / "
+         << doubleToStringX(m_slow_speed, 2) << " / "
+         << doubleToStringX(m_pivot_speed, 2) << endl;
+  m_msgs << "Sharp/Pivot angle:   "
+         << doubleToStringX(m_sharp_turn_angle, 1) << " / "
+         << doubleToStringX(m_pivot_turn_angle, 1) << endl;
+  m_msgs << "Slow down range:     "
+         << doubleToStringX(m_slow_down_range, 1) << endl;
+  m_msgs << "Current speed:       "
+         << doubleToStringX(m_current_speed, 2) << endl;
+  if(m_wpt_stat_received) {
+    unsigned int ix = 0;
+    if(m_wpt_index > 0)
+      ix = (unsigned int)m_wpt_index;
+    m_msgs << "WPT index/dist/turn: "
+           << m_wpt_index << " / "
+           << doubleToStringX(m_wpt_dist, 1) << " / "
+           << doubleToStringX(calcTurnAngle(ix), 1) << endl;
+  }
+  else
+    m_msgs << "WPT index/dist/turn: unset" << endl;
   m_msgs << "Contact:             " << m_contact_name << endl;
   if(m_contact_xy_set) {
     m_msgs << "Contact position:    "
@@ -517,6 +781,7 @@ bool GenRescue::buildReport()
            << doubleToStringX(m_contact_hdg, 1) << endl;
   else
     m_msgs << "Contact heading:     unset" << endl;
+  m_msgs << "Known contacts:      " << m_contacts.size() << endl;
   m_msgs << "NAV_X/Y set:         "
          << boolToString(m_nav_x_set && m_nav_y_set) << endl;
   return(true);
