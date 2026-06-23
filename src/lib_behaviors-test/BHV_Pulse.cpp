@@ -31,8 +31,10 @@ BHV_Pulse::BHV_Pulse(IvPDomain domain) :
   m_curr_time        = 0;
   m_prev_wpt_index   = 0;
   m_wpt_change_time  = 0;
+  m_start_time       = -1;
   m_have_wpt_index   = false;
   m_pulse_pending    = false;
+  m_initial_pulse_posted = false;
 
   addInfoVars("NAV_X, NAV_Y");
   addInfoVars("WPT_INDEX", "no_warning");
@@ -128,9 +130,20 @@ IvPFunction* BHV_Pulse::onRunState()
   if(!updateInfoIn())
     return(0);
 
+  if(m_start_time < 0)
+    m_start_time = m_curr_time;
+
+  if(!m_initial_pulse_posted && ((m_curr_time - m_start_time) >= m_pulse_delay)) {
+    postRangePulse();
+    m_initial_pulse_posted = true;
+    m_pulse_pending = false;
+    return(0);
+  }
+
   if(m_pulse_pending && ((m_curr_time - m_wpt_change_time) >= m_pulse_delay)) {
     postRangePulse();
     m_pulse_pending = false;
+    m_initial_pulse_posted = true;
   }
 
   return(0);

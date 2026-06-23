@@ -37,10 +37,12 @@ BHV_ZigLeg::BHV_ZigLeg(IvPDomain domain) :
   m_prev_wpt_index  = 0;
   m_wpt_change_time = 0;
   m_zig_start_time  = 0;
+  m_start_time      = -1;
   m_zig_heading     = 0;
   m_have_wpt_index  = false;
   m_zig_pending     = false;
   m_zig_active      = false;
+  m_initial_zig_done = false;
 
   addInfoVars("NAV_X, NAV_Y, NAV_HEADING");
   addInfoVars("WPT_INDEX", "no_warning");
@@ -170,12 +172,25 @@ IvPFunction* BHV_ZigLeg::onRunState()
   if(!updateInfoIn())
     return(0);
 
+  if(m_start_time < 0)
+    m_start_time = m_curr_time;
+
+  if(!m_initial_zig_done && ((m_curr_time - m_start_time) >= m_zig_delay)) {
+    postRangePulse();
+    m_zig_start_time = m_curr_time;
+    m_zig_heading = angle360(m_osh + m_zig_angle);
+    m_zig_pending = false;
+    m_zig_active = true;
+    m_initial_zig_done = true;
+  }
+
   if(m_zig_pending && ((m_curr_time - m_wpt_change_time) >= m_zig_delay)) {
     postRangePulse();
     m_zig_start_time = m_curr_time;
     m_zig_heading = angle360(m_osh + m_zig_angle);
     m_zig_pending = false;
     m_zig_active = true;
+    m_initial_zig_done = true;
   }
 
   if(!m_zig_active)

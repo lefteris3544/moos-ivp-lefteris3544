@@ -40,10 +40,12 @@ protected: // State variables
   double       m_prev_wpt_index;
   double       m_wpt_change_time;
   double       m_zig_start_time;
+  double       m_start_time;
   double       m_zig_heading;
   bool         m_have_wpt_index;
   bool         m_zig_pending;
   bool         m_zig_active;
+  bool         m_initial_zig_done;
 };
 
 #ifdef WIN32
