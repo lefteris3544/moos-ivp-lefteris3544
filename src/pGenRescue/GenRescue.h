@@ -84,6 +84,7 @@ class GenRescue : public AppCastingMOOSApp
   double      m_field_cx;
   double      m_field_cy;
   double      m_field_margin;
+  double      m_max_speed;
   bool        m_adaptive_speed;
   double      m_cruise_speed;
   double      m_slow_speed;

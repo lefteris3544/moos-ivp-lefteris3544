@@ -49,10 +49,11 @@ GenRescue::GenRescue()
   m_field_cx = -96.5;
   m_field_cy = -19.5;
   m_field_margin = 4.0;
-  m_adaptive_speed = true;
-  m_cruise_speed = 1.6;
-  m_slow_speed = 0.9;
-  m_pivot_speed = 0.5;
+  m_max_speed = 2.0;
+  m_adaptive_speed = false;
+  m_cruise_speed = 2.0;
+  m_slow_speed = 2.0;
+  m_pivot_speed = 2.0;
   m_sharp_turn_angle = 70;
   m_pivot_turn_angle = 115;
   m_slow_down_range = 25;
@@ -199,6 +200,8 @@ bool GenRescue::OnStartUp()
       m_path_repost_interval = atof(value.c_str());
     else if(param == "field_margin")
       m_field_margin = atof(value.c_str());
+    else if(param == "max_speed")
+      m_max_speed = atof(value.c_str());
     else if(param == "adaptive_speed")
       setBooleanOnString(m_adaptive_speed, value);
     else if(param == "cruise_speed")
@@ -219,6 +222,9 @@ bool GenRescue::OnStartUp()
 
   if(m_vname == "")
     m_vname = m_host_community;
+
+  if(m_max_speed <= 0)
+    m_max_speed = 2.0;
   
   RegisterVariables();	
   return(true);
@@ -907,8 +913,7 @@ void GenRescue::postPath()
 
   m_wpt_stat_received = false;
   m_wpt_index = -1;
-  if(m_adaptive_speed)
-    postSpeedUpdate(m_cruise_speed);
+  postSpeedUpdate(m_max_speed);
 }
 
 //---------------------------------------------------------
@@ -916,30 +921,15 @@ void GenRescue::postPath()
 
 void GenRescue::updateAdaptiveSpeed()
 {
-  if(!m_adaptive_speed || !m_wpt_stat_received || (m_wpt_index < 0))
+  if(!m_wpt_stat_received || (m_wpt_index < 0))
     return;
   if(m_path.size() == 0)
     return;
 
-  unsigned int ix = (unsigned int)m_wpt_index;
-  if(ix >= m_path.size())
-    ix = m_path.size() - 1;
-
-  double turn_angle = calcTurnAngle(ix);
-  bool close_to_turn = (m_wpt_dist <= m_slow_down_range);
-  bool sharp_turn = (turn_angle >= m_sharp_turn_angle);
-  bool pivot_turn = (turn_angle >= m_pivot_turn_angle);
-
-  double target_speed = m_cruise_speed;
-  if(close_to_turn && pivot_turn)
-    target_speed = m_pivot_speed;
-  else if(close_to_turn && sharp_turn)
-    target_speed = m_slow_speed;
-
   double elapsed = MOOSTime() - m_last_speed_post_time;
-  bool changed = (fabs(target_speed - m_current_speed) > 0.01);
+  bool changed = (fabs(m_max_speed - m_current_speed) > 0.01);
   if(changed || (elapsed >= m_speed_post_interval))
-    postSpeedUpdate(target_speed);
+    postSpeedUpdate(m_max_speed);
 }
 
 //---------------------------------------------------------
@@ -1010,8 +1000,10 @@ bool GenRescue::buildReport()
          << doubleToStringX(m_path_repost_interval, 1) << endl;
   m_msgs << "Field margin:        "
          << doubleToStringX(m_field_margin, 1) << endl;
-  m_msgs << "Adaptive speed:      " << boolToString(m_adaptive_speed) << endl;
-  m_msgs << "Cruise/Slow/Pivot:   "
+  m_msgs << "Adaptive speed:      disabled" << endl;
+  m_msgs << "Max speed:           "
+         << doubleToStringX(m_max_speed, 2) << endl;
+  m_msgs << "Configured speeds:   "
          << doubleToStringX(m_cruise_speed, 2) << " / "
          << doubleToStringX(m_slow_speed, 2) << " / "
          << doubleToStringX(m_pivot_speed, 2) << endl;
