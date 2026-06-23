@@ -35,6 +35,7 @@ GenRescue::GenRescue()
   m_nav_x_set = 0;
   m_nav_y_set = 0;
   m_plan_pending = false;
+  m_returning = false;
   m_planner = "greedy";
   m_concede_adversary = false;
   m_concede_count = 0;
@@ -44,6 +45,10 @@ GenRescue::GenRescue()
   m_competitive_weight = 0.35;
   m_competitive_lost_margin = 10;
   m_contact_replan_interval = 1.0;
+  m_path_repost_interval = 5.0;
+  m_field_cx = -96.5;
+  m_field_cy = -19.5;
+  m_field_margin = 4.0;
   m_adaptive_speed = true;
   m_cruise_speed = 1.6;
   m_slow_speed = 0.9;
@@ -63,6 +68,9 @@ GenRescue::GenRescue()
   m_wpt_stat_received = false;
   m_current_speed = -1;
   m_last_speed_post_time = 0;
+  m_last_path_repost_time = 0;
+
+  initMap();
 }
 
 //---------------------------------------------------------
@@ -87,6 +95,15 @@ bool GenRescue::OnNewMail(MOOSMSG_LIST &NewMail)
       handled = handleMailNodeReport(sval);
     else if(key == "WPT_STAT")
       handleMailWptStat(sval);
+    else if(key == "RETURN") {
+      bool return_val = false;
+      handled = setBooleanOnString(return_val, sval);
+      if(handled) {
+        m_returning = return_val;
+        if(!m_returning && (getPendingSwimmerCount() > 0))
+          m_plan_pending = true;
+      }
+    }
     else if(key == "NAV_X") {
       m_nav_x = msg.GetDouble();
       m_nav_x_set = true;
@@ -121,8 +138,20 @@ bool GenRescue::OnConnectToServer()
 bool GenRescue::Iterate()
 {
   AppCastingMOOSApp::Iterate();
+
+  if(m_returning) {
+    AppCastingMOOSApp::PostReport();
+    return(true);
+  }
   
   if(m_plan_pending && m_nav_x_set && m_nav_y_set)
+    postShortestPath();
+
+  bool have_pending = (getPendingSwimmerCount() > 0);
+  double elapsed = MOOSTime() - m_last_path_repost_time;
+  if(have_pending && m_nav_x_set && m_nav_y_set &&
+     (m_path_repost_interval > 0) &&
+     (elapsed >= m_path_repost_interval))
     postShortestPath();
 
   updateAdaptiveSpeed();
@@ -166,6 +195,10 @@ bool GenRescue::OnStartUp()
       m_competitive_lost_margin = atof(value.c_str());
     else if(param == "contact_replan_interval")
       m_contact_replan_interval = atof(value.c_str());
+    else if(param == "path_repost_interval")
+      m_path_repost_interval = atof(value.c_str());
+    else if(param == "field_margin")
+      m_field_margin = atof(value.c_str());
     else if(param == "adaptive_speed")
       setBooleanOnString(m_adaptive_speed, value);
     else if(param == "cruise_speed")
@@ -204,6 +237,7 @@ void GenRescue::RegisterVariables()
   Register("NAV_X", 0);
   Register("NAV_Y", 0);
   Register("WPT_STAT", 0);
+  Register("RETURN", 0);
 }
 
 
@@ -220,7 +254,11 @@ bool GenRescue::handleMailNewSwimmer(string str)
     return(false);
 
   if(m_swimmers.count(id) == 0) {
-    XYPoint point(x, y);
+    double sx = x;
+    double sy = y;
+    getSafePoint(x, y, sx, sy);
+
+    XYPoint point(sx, sy);
     point.set_label(id);
     m_swimmers[id] = point;
     m_plan_pending = true;
@@ -335,6 +373,7 @@ void GenRescue::postShortestPath()
 
   m_path.set_label("rescue_path_" + m_vname);
   postPath();
+  m_last_path_repost_time = MOOSTime();
   m_plan_pending = false;
 }
 
@@ -375,6 +414,9 @@ XYSegList GenRescue::buildGreedyTwoHopPath(XYSegList pending,
       double ix = pending.get_vx(i);
       double iy = pending.get_vy(i);
       double score = distPointToPoint(curr_x, curr_y, ix, iy);
+
+      if(!segmentIsSafe(curr_x, curr_y, ix, iy))
+        score += 500.0;
 
       if(pending.size() > 1) {
         double nearest_next = numeric_limits<double>::max();
@@ -430,6 +472,8 @@ XYSegList GenRescue::buildCompetitivePath(XYSegList pending,
       double ix = pending.get_vx(i);
       double iy = pending.get_vy(i);
       double own_dist = distPointToPoint(curr_x, curr_y, ix, iy);
+      if(!segmentIsSafe(curr_x, curr_y, ix, iy))
+        own_dist += 500.0;
       double contact_dist = getNearestContactDist(ix, iy);
       bool lost = ((contact_dist + m_competitive_lost_margin) < own_dist);
       if(!lost)
@@ -440,6 +484,8 @@ XYSegList GenRescue::buildCompetitivePath(XYSegList pending,
       double ix = pending.get_vx(i);
       double iy = pending.get_vy(i);
       double own_dist = distPointToPoint(curr_x, curr_y, ix, iy);
+      if(!segmentIsSafe(curr_x, curr_y, ix, iy))
+        own_dist += 500.0;
       double contact_dist = getNearestContactDist(ix, iy);
       bool lost = ((contact_dist + m_competitive_lost_margin) < own_dist);
       if(lost && have_winnable)
@@ -498,6 +544,216 @@ double GenRescue::getNearestContactDist(double x, double y) const
   }
 
   return(nearest);
+}
+
+//---------------------------------------------------------
+// Procedure: initMap()
+
+void GenRescue::initMap()
+{
+  m_field_poly.clear();
+  m_obstacles.clear();
+
+  m_field_poly.push_back(RescuePoint{-215, -2});
+  m_field_poly.push_back(RescuePoint{ -76,-86});
+  m_field_poly.push_back(RescuePoint{ -16,  6});
+  m_field_poly.push_back(RescuePoint{ -79,  4});
+
+  m_obstacles.push_back(RescueObstacle{"buoy_1", -35.0,  -6.0, 5.0, 10.0});
+  m_obstacles.push_back(RescueObstacle{"buoy_2", -62.5, -17.9, 5.0, 10.0});
+  m_obstacles.push_back(RescueObstacle{"buoy_3", -95.0, -28.0, 5.0, 10.0});
+}
+
+//---------------------------------------------------------
+// Procedure: pointSegDist()
+
+double GenRescue::pointSegDist(double px, double py,
+                               double x1, double y1,
+                               double x2, double y2) const
+{
+  double vx = x2 - x1;
+  double vy = y2 - y1;
+  double wx = px - x1;
+  double wy = py - y1;
+
+  double len2 = (vx * vx) + (vy * vy);
+  if(len2 <= 0.0001)
+    return(distPointToPoint(px, py, x1, y1));
+
+  double t = ((wx * vx) + (wy * vy)) / len2;
+  if(t < 0)
+    t = 0;
+  if(t > 1)
+    t = 1;
+
+  double cx = x1 + (t * vx);
+  double cy = y1 + (t * vy);
+
+  return(distPointToPoint(px, py, cx, cy));
+}
+
+//---------------------------------------------------------
+// Procedure: pointInField()
+
+bool GenRescue::pointInField(double x, double y) const
+{
+  bool inside = false;
+  unsigned int n = m_field_poly.size();
+
+  if(n < 3)
+    return(true);
+
+  for(unsigned int i=0, j=n-1; i<n; j=i++) {
+    double xi = m_field_poly[i].x;
+    double yi = m_field_poly[i].y;
+    double xj = m_field_poly[j].x;
+    double yj = m_field_poly[j].y;
+
+    bool intersect = ((yi > y) != (yj > y)) &&
+      (x < (xj - xi) * (y - yi) / ((yj - yi) + 0.000001) + xi);
+
+    if(intersect)
+      inside = !inside;
+  }
+
+  return(inside);
+}
+
+//---------------------------------------------------------
+// Procedure: fieldBoundaryDist()
+
+double GenRescue::fieldBoundaryDist(double x, double y) const
+{
+  if(m_field_poly.size() < 2)
+    return(9999);
+
+  double best = numeric_limits<double>::max();
+  unsigned int n = m_field_poly.size();
+
+  for(unsigned int i=0; i<n; i++) {
+    unsigned int j = (i + 1) % n;
+
+    double d = pointSegDist(x, y,
+                            m_field_poly[i].x, m_field_poly[i].y,
+                            m_field_poly[j].x, m_field_poly[j].y);
+    if(d < best)
+      best = d;
+  }
+
+  return(best);
+}
+
+//---------------------------------------------------------
+// Procedure: pointIsSafe()
+
+bool GenRescue::pointIsSafe(double x, double y) const
+{
+  if(!pointInField(x, y))
+    return(false);
+
+  if(fieldBoundaryDist(x, y) < m_field_margin)
+    return(false);
+
+  for(unsigned int i=0; i<m_obstacles.size(); i++) {
+    const RescueObstacle& obs = m_obstacles[i];
+    if(distPointToPoint(x, y, obs.x, obs.y) < obs.target_radius)
+      return(false);
+  }
+
+  return(true);
+}
+
+//---------------------------------------------------------
+// Procedure: segmentIsSafe()
+
+bool GenRescue::segmentIsSafe(double x1, double y1,
+                              double x2, double y2) const
+{
+  if(!pointIsSafe(x2, y2))
+    return(false);
+
+  for(unsigned int i=1; i<=20; i++) {
+    double t = (double)(i) / 20.0;
+    double x = x1 + t * (x2 - x1);
+    double y = y1 + t * (y2 - y1);
+
+    if(!pointInField(x, y))
+      return(false);
+
+    if(fieldBoundaryDist(x, y) < 1.0)
+      return(false);
+  }
+
+  for(unsigned int i=0; i<m_obstacles.size(); i++) {
+    const RescueObstacle& obs = m_obstacles[i];
+    double d = pointSegDist(obs.x, obs.y, x1, y1, x2, y2);
+    if(d < obs.segment_radius)
+      return(false);
+  }
+
+  return(true);
+}
+
+//---------------------------------------------------------
+// Procedure: getSafePoint()
+
+void GenRescue::getSafePoint(double x, double y,
+                             double& sx, double& sy) const
+{
+  sx = x;
+  sy = y;
+
+  if(pointIsSafe(sx, sy))
+    return;
+
+  double vx = m_field_cx - x;
+  double vy = m_field_cy - y;
+  double vd = sqrt((vx * vx) + (vy * vy));
+
+  if(vd > 0.001) {
+    double cx = x + 4.0 * vx / vd;
+    double cy = y + 4.0 * vy / vd;
+
+    if(pointIsSafe(cx, cy)) {
+      sx = cx;
+      sy = cy;
+      return;
+    }
+  }
+
+  double best_x = sx;
+  double best_y = sy;
+  double best_d = numeric_limits<double>::max();
+  const double pi_val = 3.14159265358979323846;
+
+  for(double rad=1.0; rad<=5.0; rad+=0.5) {
+    for(unsigned int k=0; k<72; k++) {
+      double ang = (2.0 * pi_val * (double)(k)) / 72.0;
+      double cx = x + rad * cos(ang);
+      double cy = y + rad * sin(ang);
+
+      if(!pointIsSafe(cx, cy))
+        continue;
+
+      double cd = distPointToPoint(x, y, cx, cy);
+      if(cd < best_d) {
+        best_d = cd;
+        best_x = cx;
+        best_y = cy;
+      }
+    }
+  }
+
+  if(best_d < numeric_limits<double>::max()) {
+    sx = best_x;
+    sy = best_y;
+    return;
+  }
+
+  if(vd > 0.001) {
+    sx = x + 4.0 * vx / vd;
+    sy = y + 4.0 * vy / vd;
+  }
 }
 
 //---------------------------------------------------------
@@ -644,6 +900,10 @@ void GenRescue::postPath()
 
   Notify(update_var, update_str);
   reportEvent("SURVEY_UPDATE=" + update_str);
+  if(!m_returning) {
+    Notify("DEPLOY", "true");
+    Notify("STATION_KEEP", "false");
+  }
 
   m_wpt_stat_received = false;
   m_wpt_index = -1;
@@ -733,6 +993,7 @@ bool GenRescue::buildReport()
   m_msgs << "Conceded swimmers:   " << m_conceded_swimmers.size()
          << " [" << stringFromSet(m_conceded_swimmers) << "]" << endl;
   m_msgs << "Path points:         " << m_path.size() << endl;
+  m_msgs << "Returning:           " << boolToString(m_returning) << endl;
   m_msgs << "Planner:             " << m_planner << endl;
   m_msgs << "Concede adversary:   " << boolToString(m_concede_adversary) << endl;
   m_msgs << "Concede nearest N:   " << m_concede_count << endl;
@@ -745,6 +1006,10 @@ bool GenRescue::buildReport()
   m_msgs << "Lost margin/replan:  "
          << doubleToStringX(m_competitive_lost_margin, 1) << " / "
          << doubleToStringX(m_contact_replan_interval, 1) << endl;
+  m_msgs << "Path repost interval:"
+         << doubleToStringX(m_path_repost_interval, 1) << endl;
+  m_msgs << "Field margin:        "
+         << doubleToStringX(m_field_margin, 1) << endl;
   m_msgs << "Adaptive speed:      " << boolToString(m_adaptive_speed) << endl;
   m_msgs << "Cruise/Slow/Pivot:   "
          << doubleToStringX(m_cruise_speed, 2) << " / "

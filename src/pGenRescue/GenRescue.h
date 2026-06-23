@@ -16,6 +16,19 @@
 #include "XYPoint.h"
 #include "XYPolygon.h"
 
+struct RescuePoint {
+  double x;
+  double y;
+};
+
+struct RescueObstacle {
+  std::string label;
+  double x;
+  double y;
+  double target_radius;
+  double segment_radius;
+};
+
 class GenRescue : public AppCastingMOOSApp
 {
  public:
@@ -45,6 +58,13 @@ class GenRescue : public AppCastingMOOSApp
   XYSegList buildGreedyTwoHopPath(XYSegList, double, double) const;
   XYSegList buildCompetitivePath(XYSegList, double, double) const;
   double getNearestContactDist(double, double) const;
+  void initMap();
+  double pointSegDist(double, double, double, double, double, double) const;
+  bool pointInField(double, double) const;
+  double fieldBoundaryDist(double, double) const;
+  bool pointIsSafe(double, double) const;
+  bool segmentIsSafe(double, double, double, double) const;
+  void getSafePoint(double, double, double&, double&) const;
   std::set<std::string> getConcededSwimmers() const;
   std::string stringFromSet(std::set<std::string>) const;
   unsigned int getPendingSwimmerCount() const;
@@ -60,6 +80,10 @@ class GenRescue : public AppCastingMOOSApp
   double      m_competitive_weight;
   double      m_competitive_lost_margin;
   double      m_contact_replan_interval;
+  double      m_path_repost_interval;
+  double      m_field_cx;
+  double      m_field_cy;
+  double      m_field_margin;
   bool        m_adaptive_speed;
   double      m_cruise_speed;
   double      m_slow_speed;
@@ -75,6 +99,7 @@ class GenRescue : public AppCastingMOOSApp
   std::set<std::string> m_found_swimmers;
   std::set<std::string> m_conceded_swimmers;
   bool       m_plan_pending;
+  bool       m_returning;
   double     m_nav_x;
   double     m_nav_y;
   bool       m_nav_x_set;
@@ -87,11 +112,14 @@ class GenRescue : public AppCastingMOOSApp
   bool       m_contact_hdg_set;
   double     m_last_contact_replan_time;
   std::map<std::string, XYPoint> m_contacts;
+  std::vector<RescuePoint> m_field_poly;
+  std::vector<RescueObstacle> m_obstacles;
   int        m_wpt_index;
   double     m_wpt_dist;
   bool       m_wpt_stat_received;
   double     m_current_speed;
   double     m_last_speed_post_time;
+  double     m_last_path_repost_time;
 };
 
 #endif 
