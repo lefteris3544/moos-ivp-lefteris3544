@@ -49,15 +49,15 @@ GenRescue::GenRescue()
   m_field_cx = -96.5;
   m_field_cy = -19.5;
   m_field_margin = 4.0;
-  m_max_speed = 2.0;
+  m_max_speed = 1.2;
   m_adaptive_speed = false;
-  m_cruise_speed = 2.0;
-  m_slow_speed = 2.0;
-  m_pivot_speed = 2.0;
+  m_cruise_speed = 1.2;
+  m_slow_speed = 1.2;
+  m_pivot_speed = 1.2;
   m_sharp_turn_angle = 70;
   m_pivot_turn_angle = 115;
   m_slow_down_range = 25;
-  m_speed_post_interval = 1.0;
+  m_speed_post_interval = 1.2;
   m_contact_x = 0;
   m_contact_y = 0;
   m_contact_hdg = 0;
@@ -224,7 +224,7 @@ bool GenRescue::OnStartUp()
     m_vname = m_host_community;
 
   if(m_max_speed <= 0)
-    m_max_speed = 2.0;
+    m_max_speed = 1.2;
   
   RegisterVariables();	
   return(true);
