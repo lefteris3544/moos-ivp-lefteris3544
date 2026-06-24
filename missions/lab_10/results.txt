@@ -1,2 +1,3 @@
       score1=9, score2=0, dur=950.3, team1=abe, team2=unknown, winner=abe, mtype=rescue_r2, mhash_short=[CAGY-ELMS], mhash_lshort=P-CAGY-ELMS, mhash=mhash=260621-1756P-CAGY-ELMS,utc=1782053771.31
   score1=7, score2=0, dur=950.2, team1=abe, team2=unknown, winner=abe, mtype=rescue_r2, mhash_short=[COOL-NEED], mhash_lshort=T-COOL-NEED, mhash=mhash=260621-1803T-COOL-NEED,utc=1782054223.02
+  score1=15, score2=0, dur=297.6, team1=abe, team2=unknown, winner=abe, mtype=rescue_r2, mhash_short=[FOUL-NORM], mhash_lshort=K-FOUL-NORM, mhash=mhash=260623-1556K-FOUL-NORM,utc=1782219404.93

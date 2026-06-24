@@ -34,10 +34,8 @@ protected: // State variables
   double       m_curr_time;
   double       m_prev_wpt_index;
   double       m_wpt_change_time;
-  double       m_start_time;
   bool         m_have_wpt_index;
   bool         m_pulse_pending;
-  bool         m_initial_pulse_posted;
 };
 
 #ifdef WIN32

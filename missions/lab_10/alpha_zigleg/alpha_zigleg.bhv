@@ -1,4 +1,4 @@
-//--------    FILE: alpha.bhv   -------------
+//--------    FILE: alpha_zigleg.bhv   -------------
 
 initialize   DEPLOY = false
 initialize   RETURN = false
@@ -73,15 +73,15 @@ Behavior=BHV_Waypoint
  }
 
 //----------------------------------------------
-Behavior=BHV_Pulse
+Behavior=BHV_ZigLeg
 {
-  name      = pulse
-  pwt       = 100
+  name      = zigleg
+  pwt       = 300
   condition = RETURN = false
   condition = DEPLOY = true
 
-  pulse_range    = 20
-  pulse_duration = 4
+  zig_duration = 30
+  zig_angle    = 60
 }
 
 //----------------------------------------------

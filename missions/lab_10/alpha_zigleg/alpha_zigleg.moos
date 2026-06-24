@@ -1,6 +1,6 @@
 //-------------------------------------------------
-// NAME: M. Benjamin, MIT CSAIL
-// FILE: alpha.moos
+// NAME: Terry Alifragkis
+// FILE: alpha_zigleg.moos
 //-------------------------------------------------
 
 ServerHost   = localhost
@@ -96,8 +96,8 @@ ProcessConfig = pHelmIvP
   AppTick    = 4
   CommsTick  = 4
 
-  behaviors  = alpha.bhv
-  ivp_behavior_dir = ../../../lib
+  behaviors  = alpha_zigleg.bhv
+  ivp_behavior_dir = /home/lefteris/Marine_Autonomy/moos-ivp-lefteris3544/lib
   domain     = course:0:359:360
   domain     = speed:0:4:41
 }

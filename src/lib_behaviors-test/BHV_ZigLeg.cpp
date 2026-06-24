@@ -1,5 +1,5 @@
 /************************************************************/
-/*    NAME: Lefteris                                       */
+/*    NAME: Terry Alifragkis                               */
 /*    ORGN: MIT                                            */
 /*    FILE: BHV_ZigLeg.cpp                                 */
 /*    DATE: June 2026                                      */
@@ -10,7 +10,6 @@
 #include "BHV_ZigLeg.h"
 #include "BuildUtils.h"
 #include "MBUtils.h"
-#include "XYRangePulse.h"
 #include "ZAIC_PEAK.h"
 
 using namespace std;
@@ -24,12 +23,10 @@ BHV_ZigLeg::BHV_ZigLeg(IvPDomain domain) :
   IvPBehavior::setParam("name", "zigleg");
   m_domain = subDomain(m_domain, "course");
 
-  m_zig_duration   = 10;
-  m_zig_angle      = 45;
-  m_zig_delay      = 5;
-  m_pulse_range    = 20;
-  m_pulse_duration = 4;
-
+  m_zig_duration   = 50;
+  m_zig_angle      = 60;
+  m_zig_delay      = 20;
+  
   m_osx             = 0;
   m_osy             = 0;
   m_osh             = 0;
@@ -37,12 +34,10 @@ BHV_ZigLeg::BHV_ZigLeg(IvPDomain domain) :
   m_prev_wpt_index  = 0;
   m_wpt_change_time = 0;
   m_zig_start_time  = 0;
-  m_start_time      = -1;
   m_zig_heading     = 0;
   m_have_wpt_index  = false;
   m_zig_pending     = false;
   m_zig_active      = false;
-  m_initial_zig_done = false;
 
   addInfoVars("NAV_X, NAV_Y, NAV_HEADING");
   addInfoVars("WPT_INDEX", "no_warning");
@@ -86,19 +81,11 @@ bool BHV_ZigLeg::updateInfoIn()
 
   bool ok_wpt_index;
   double wpt_index = getBufferDoubleVal("WPT_INDEX", ok_wpt_index);
-  if(!ok_wpt_index) {
-    if(!m_have_wpt_index) {
-      m_wpt_change_time = m_curr_time;
-      m_zig_pending = true;
-      m_have_wpt_index = true;
-    }
+  if(!ok_wpt_index)
     return(true);
-  }
 
   if(!m_have_wpt_index) {
     m_prev_wpt_index = wpt_index;
-    m_wpt_change_time = m_curr_time;
-    m_zig_pending = true;
     m_have_wpt_index = true;
     return(true);
   }
@@ -117,18 +104,14 @@ bool BHV_ZigLeg::updateInfoIn()
 
 void BHV_ZigLeg::postRangePulse()
 {
-  XYRangePulse pulse;
-  pulse.set_x(m_osx);
-  pulse.set_y(m_osy);
-  pulse.set_label("bhv_zigleg");
-  pulse.set_rad(m_pulse_range);
-  pulse.set_time(m_curr_time);
-  pulse.set_duration(m_pulse_duration);
-  pulse.set_color("edge", "orange");
-  pulse.set_color("fill", "orange");
-  pulse.set_edge_size(1);
+  string pulse = "x=" + doubleToString(m_osx, 2);
+  pulse += ",y=" + doubleToString(m_osy, 2);
+  pulse += ",radius=" + doubleToString(m_pulse_range, 2);
+  pulse += ",duration=" + doubleToString(m_pulse_duration, 2);
+  pulse += ",label=bhv_zigleg";
+  pulse += ",edge_color=orange,fill_color=orange";
 
-  postMessage("VIEW_RANGE_PULSE", pulse.get_spec());
+  postMessage("VIEW_RANGE_PULSE", pulse);
 }
 
 //---------------------------------------------------------------
@@ -172,25 +155,12 @@ IvPFunction* BHV_ZigLeg::onRunState()
   if(!updateInfoIn())
     return(0);
 
-  if(m_start_time < 0)
-    m_start_time = m_curr_time;
-
-  if(!m_initial_zig_done && ((m_curr_time - m_start_time) >= m_zig_delay)) {
-    postRangePulse();
-    m_zig_start_time = m_curr_time;
-    m_zig_heading = angle360(m_osh + m_zig_angle);
-    m_zig_pending = false;
-    m_zig_active = true;
-    m_initial_zig_done = true;
-  }
-
   if(m_zig_pending && ((m_curr_time - m_wpt_change_time) >= m_zig_delay)) {
     postRangePulse();
     m_zig_start_time = m_curr_time;
     m_zig_heading = angle360(m_osh + m_zig_angle);
     m_zig_pending = false;
     m_zig_active = true;
-    m_initial_zig_done = true;
   }
 
   if(!m_zig_active)
