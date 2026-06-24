@@ -102,6 +102,9 @@ BHV_Scout::BHV_Scout(IvPDomain gdomain) :
   m_rescue_trail_gap   = 10;
   m_rescue_avoid_radius = 18;
   m_rescue_trail_max_pts = 80;
+  m_random_search_after_points = true;
+  m_visited_avoid_radius = 22;
+  m_random_search_tries = 120;
 
   m_scout_points.push_back(XYPoint(-76, -70));
   m_scout_points.push_back(XYPoint(-185, -10));
@@ -160,6 +163,12 @@ bool BHV_Scout::setParam(string param, string val)
     handled = setPosDoubleOnString(m_rescue_trail_gap, val);
   else if(param == "rescue_avoid_radius")
     handled = setPosDoubleOnString(m_rescue_avoid_radius, val);
+  else if(param == "random_search_after_points")
+    handled = setBooleanOnString(m_random_search_after_points, val);
+  else if(param == "visited_avoid_radius")
+    handled = setPosDoubleOnString(m_visited_avoid_radius, val);
+  else if(param == "random_search_tries")
+    handled = setUIntOnString(m_random_search_tries, val);
   else
     handled = false;
   
@@ -321,6 +330,34 @@ bool BHV_Scout::scoutPointConflictsWithRescueTrail(const XYPoint& pt) const
 }
 
 //---------------------------------------------------------------
+// Procedure: addVisitedPoint()
+
+void BHV_Scout::addVisitedPoint(double x, double y)
+{
+  for(unsigned int i=0; i<m_visited_points.size(); i++) {
+    double dist = hypot(x - m_visited_points[i].x(), y - m_visited_points[i].y());
+    if(dist <= m_capture_radius)
+      return;
+  }
+
+  m_visited_points.push_back(XYPoint(x, y));
+}
+
+//---------------------------------------------------------------
+// Procedure: pointNearVisited()
+
+bool BHV_Scout::pointNearVisited(double x, double y) const
+{
+  for(unsigned int i=0; i<m_visited_points.size(); i++) {
+    double dist = hypot(x - m_visited_points[i].x(), y - m_visited_points[i].y());
+    if(dist <= m_visited_avoid_radius)
+      return(true);
+  }
+
+  return(false);
+}
+
+//---------------------------------------------------------------
 // Procedure: updateZigLeg()
 
 void BHV_Scout::updateZigLeg()
@@ -418,12 +455,20 @@ IvPFunction *BHV_Scout::onRunState()
   double dist = hypot((m_ptx-m_osx), (m_pty-m_osy));
   //postEventMessage("Dist=" + doubleToStringX(dist,1));
   if(dist <= m_capture_radius) {
+    addVisitedPoint(m_ptx, m_pty);
     m_pt_set = false;
     postViewPoint(false);
 
     if(m_use_config_points) {
       if((m_point_ix + 1) < m_scout_points.size()) {
 	m_point_ix++;
+	updateScoutPoint();
+	m_zig_active = false;
+	return(0);
+      }
+
+      if(m_random_search_after_points) {
+	m_use_config_points = false;
 	updateScoutPoint();
 	m_zig_active = false;
 	return(0);
@@ -437,6 +482,10 @@ IvPFunction *BHV_Scout::onRunState()
       }
 
       setComplete();
+    }
+    else {
+      updateScoutPoint();
+      m_zig_active = false;
     }
 
     return(0);
@@ -519,7 +568,32 @@ bool BHV_Scout::updateScoutPoint()
 
   double ptx = 0;
   double pty = 0;
-  bool ok = randPointInPoly(m_rescue_region, ptx, pty);
+  bool ok = false;
+  bool relaxed_visited_check = false;
+  for(unsigned int i=0; i<m_random_search_tries; i++) {
+    ok = randPointInPoly(m_rescue_region, ptx, pty);
+    if(!ok)
+      break;
+
+    if(pointNearVisited(ptx, pty))
+      continue;
+    if(pointNearRescueTrail(ptx, pty))
+      continue;
+
+    break;
+  }
+
+  if(ok && (pointNearVisited(ptx, pty) || pointNearRescueTrail(ptx, pty))) {
+    relaxed_visited_check = true;
+    for(unsigned int i=0; i<m_random_search_tries; i++) {
+      ok = randPointInPoly(m_rescue_region, ptx, pty);
+      if(!ok)
+	break;
+      if(!pointNearRescueTrail(ptx, pty))
+	break;
+    }
+  }
+
   if(!ok) {
     postWMessage("Unable to generate scout point");
     return(false);
@@ -528,7 +602,10 @@ bool BHV_Scout::updateScoutPoint()
   m_ptx = ptx;
   m_pty = pty;
   m_pt_set = true;
-  string msg = "New pt: " + doubleToStringX(ptx) + "," + doubleToStringX(pty);
+  string msg = "Random scout pt: " + doubleToStringX(ptx) + "," +
+    doubleToStringX(pty);
+  if(relaxed_visited_check)
+    msg += " (visited spacing relaxed)";
   postEventMessage(msg);
   return(true);
 }

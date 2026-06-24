@@ -50,6 +50,8 @@ protected:
   bool         pointNearRescueTrail(double, double) const;
   bool         segmentNearRescueTrail(double, double, double, double) const;
   bool         scoutPointConflictsWithRescueTrail(const XYPoint&) const;
+  void         addVisitedPoint(double, double);
+  bool         pointNearVisited(double, double) const;
   void         updateZigLeg();
   void         postZigPulse();
   void         postViewPoint(bool viewable=true);
@@ -69,6 +71,7 @@ protected: // State variables
   double   m_zig_heading;
   double   m_zig_side;
   std::vector<XYPoint> m_rescue_trail;
+  std::vector<XYPoint> m_visited_points;
 
   XYPolygon m_rescue_region;
 
@@ -86,6 +89,9 @@ protected: // Config variables
   double m_rescue_trail_gap;
   double m_rescue_avoid_radius;
   unsigned int m_rescue_trail_max_pts;
+  bool   m_random_search_after_points;
+  double m_visited_avoid_radius;
+  unsigned int m_random_search_tries;
 
   std::vector<XYPoint> m_scout_points;
 
