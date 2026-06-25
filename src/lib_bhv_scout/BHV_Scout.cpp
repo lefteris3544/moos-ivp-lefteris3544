@@ -1,8 +1,8 @@
 /*****************************************************************/
-/*    NAME: M.Benjamin                                           */
+/*    NAME: Terry Alifragkis                                          */
 /*    ORGN: Dept of Mechanical Eng / CSAIL, MIT Cambridge MA     */
 /*    FILE: BHV_Scout.cpp                                        */
-/*    DATE: April 30th 2022                                      */
+/*    DATE: June 25 2026                                      */
 /*****************************************************************/
 
 #include <cstdlib>
