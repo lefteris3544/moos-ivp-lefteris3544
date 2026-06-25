@@ -29,6 +29,21 @@
 #include "XYPoint.h"
 #include "XYPolygon.h"
 
+struct ScoutCandidate {
+  double x;
+  double y;
+  double score;
+  double last_visit;
+  bool   visited;
+};
+
+struct ScoutSwimmer {
+  std::string id;
+  std::string type;
+  double x;
+  double y;
+};
+
 class BHV_Scout : public IvPBehavior {
 public:
   BHV_Scout(IvPDomain);
@@ -45,6 +60,15 @@ protected:
   bool         setScoutPoints(std::string);
   bool         setRepeat(std::string);
   double       angle360(double) const;
+  bool         updateRescueRegion();
+  void         buildSearchCandidates();
+  bool         selectBestCandidate();
+  double       candidateScore(const ScoutCandidate&, std::string&) const;
+  std::string  getScoutMode() const;
+  void         handleKnownReports();
+  void         addSwimmerReport(std::string, std::string);
+  bool         addKnownSwimmer(std::string, std::string, double, double);
+  void         updateRescuePath();
   void         updateRescueTrail();
   bool         addRescueTrailPoint(double, double);
   bool         pointNearRescueTrail(double, double) const;
@@ -52,7 +76,13 @@ protected:
   bool         scoutPointConflictsWithRescueTrail(const XYPoint&) const;
   void         addVisitedPoint(double, double);
   bool         pointNearVisited(double, double) const;
+  double       nearestVisitedDist(double, double) const;
+  double       nearestRescueDist(double, double) const;
+  double       nearestRegisteredDist(double, double) const;
+  double       nearestKnownSwimmerDist(double, double) const;
+  void         postScoutDebug(std::string, double, std::string);
   void         updateZigLeg();
+  bool         shouldUseZig() const;
   void         postZigPulse();
   void         postViewPoint(bool viewable=true);
 
@@ -71,9 +101,28 @@ protected: // State variables
   double   m_zig_heading;
   double   m_zig_side;
   std::vector<XYPoint> m_rescue_trail;
+  std::vector<XYPoint> m_rescue_path;
   std::vector<XYPoint> m_visited_points;
+  std::vector<ScoutCandidate> m_candidates;
+  std::vector<ScoutSwimmer> m_known_swimmers;
+  std::vector<ScoutSwimmer> m_registered_swimmers;
+  std::vector<std::string> m_found_swimmer_ids;
 
   XYPolygon m_rescue_region;
+  bool     m_region_set;
+  bool     m_candidates_built;
+  bool     m_rescue_pos_set;
+  double   m_rescue_x;
+  double   m_rescue_y;
+  double   m_mission_start_time;
+  double   m_last_discovery_time;
+  double   m_local_search_until;
+  double   m_selected_score;
+  bool     m_selected_high_value;
+  std::string m_selected_reason;
+  std::string m_region_spec;
+  unsigned int m_discovered_unreg_count;
+  unsigned int m_rescued_count;
 
 protected: // Config variables
   double m_capture_radius;
@@ -90,8 +139,21 @@ protected: // Config variables
   double m_rescue_avoid_radius;
   unsigned int m_rescue_trail_max_pts;
   bool   m_random_search_after_points;
+  double m_visited_radius;
   double m_visited_avoid_radius;
   unsigned int m_random_search_tries;
+  double m_grid_spacing;
+  double m_lane_spacing;
+  double m_registered_avoid_radius;
+  double m_local_search_radius;
+  double m_local_search_time;
+  double m_early_phase_time;
+  unsigned int m_urgency_queue_threshold;
+  bool   m_use_rescue_path;
+  bool   m_debug;
+  double m_distance_weight;
+  double m_age_weight;
+  double m_high_value_score;
 
   std::vector<XYPoint> m_scout_points;
 

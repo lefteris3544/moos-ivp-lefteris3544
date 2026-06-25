@@ -560,7 +560,7 @@ void GenRescue::initMap()
   m_field_poly.clear();
   m_obstacles.clear();
 
-  m_field_poly.push_back(RescuePoint{-215, -2});
+  m_field_poly.push_back(RescuePoint{-205, -4});
   m_field_poly.push_back(RescuePoint{ -76,-86});
   m_field_poly.push_back(RescuePoint{ -16,  6});
   m_field_poly.push_back(RescuePoint{ -79,  4});
